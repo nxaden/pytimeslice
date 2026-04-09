@@ -6,6 +6,7 @@ setup:
 	$(PYTHON) -m venv $(VENV)
 	$(ACTIVATE) && pip install --upgrade pip
 	$(ACTIVATE) && pip install -r requirements.txt -r requirements-dev.txt
+	$(ACTIVATE) && pip install -e .
 	$(ACTIVATE) && pre-commit install
 
 run:
