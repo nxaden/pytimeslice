@@ -5,7 +5,7 @@ from typing import List
 import numpy as np
 from PIL import Image
 
-from fragmento_core.domain.compositor import build_timeslice
+from fragmento_engine.domain.compositor import build_timeslice
 
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}

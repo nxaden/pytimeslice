@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fragmento-core"
+name = "fragmento-engine"
 version = "0.1.0"
 description = "Core image processing engine for Fragmento"
 readme = "README.md"
