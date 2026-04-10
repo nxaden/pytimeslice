@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Literal, Protocol, Sequence
+
+from fragmento_engine.domain.compositor import build_timeslice
+from fragmento_engine.domain.models import CompositeResult, RGBImage, TimesliceSpec
+
+ResizeMode = Literal["crop", "resize"]
+
+
+class ImageSequenceLoader(Protocol):
+    """Application layer contract for loading an ordered image sequence."""
+
+    def get_image_paths(self, folder: Path) -> list[Path]:
+        """Return the ordered list of image paths contained in `folder`.
+
+        Args:
+            folder: Directory containing the source image sequence.
+
+        Returns:
+            A list of image paths in processing order.
+
+        Raises:
+            Implementations may raise exceptions if the folder cannot be read.
+        """
+        ...
+
+    def load_images(
+        self,
+        paths: Sequence[Path],
+        resize_mode: ResizeMode = "crop",
+    ) -> list[RGBImage]:
+        """Load the given image paths into normalized RGB arrays.
+
+        Args:
+            paths: Ordered source image paths to load.
+            resize_mode: Strategy for handling images whose dimensions do not
+                match the base frame size.
+
+        Returns:
+            A list of RGB images as numpy arrays.
+
+        Raises:
+            ValueError: If the input sequence is invalid.
+            OSError: If image files cannot be opened or decoded.
+        """
+        ...
+
+
+class ImageWriter(Protocol):
+    """Application-layer contract for persisting rendered images.
+
+    Concrete implementations decide how and where the image is written,
+    such as saving to local disk with PIL or using another backend.
+    """
+
+    def save(self, image: RGBImage, output_file: Path) -> None:
+        """Persist an RGB image to the given output path.
+
+        Args:
+            image: The rendered RGB image to save.
+            output_file: Destination path for the saved file.
+
+        Raises:
+            OSError: If the file cannot be written.
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class RenderRequest:
+    """Input payload for a timeslice render workflow.
+
+    Attributes:
+        input_folder: Directory containing the ordered source image sequence.
+        spec: Domain-level render specification describing how the timeslice
+            should be built.
+        resize_mode: Strategy for reconciling dimension mismatches across
+            source images before rendering.
+    """
+
+    input_folder: Path
+    spec: TimesliceSpec
+    resize_mode: ResizeMode = "crop"
+
+
+@dataclass(frozen=True)
+class RenderResponse:
+    """Output payload for a completed render workflow.
+
+    Attributes:
+        result: The final composite result returned by the domain layer.
+        input_paths: The ordered source image paths used during rendering.
+    """
+
+    result: CompositeResult
+    input_paths: list[Path]
+
+
+class RenderTimesliceService:
+    """Application service for rendering a timeslice from an image folder.
+
+    This service coordinates the render workflow:
+    1. validate the input folder
+    2. discover source image paths
+    3. load the images through a sequence loader
+    4. invoke the domain compositor with a `TimesliceSpec`
+    5. optionally persist the rendered image through an image writer
+    """
+
+    def __init__(
+        self,
+        sequence_loader: ImageSequenceLoader,
+        image_writer: ImageWriter | None = None,
+    ) -> None:
+        """Initialize the render service.
+
+        Args:
+            sequence_loader: Adapter responsible for discovering and loading
+                source images.
+            image_writer: Optional adapter for saving rendered output files.
+                Required only when `render_to_file` is used.
+        """
+        self._sequence_loader = sequence_loader
+        self._image_writer = image_writer
+
+    def render(self, request: RenderRequest) -> RenderResponse:
+        """Render a timeslice composite from the requested input folder.
+
+        Args:
+            request: Structured render input containing the source folder,
+                render specification, and resize behavior.
+
+        Returns:
+            A `RenderResponse` containing the composite result and the ordered
+            source image paths used for rendering.
+
+        Raises:
+            ValueError: If the input folder is missing, is not a directory,
+                or contains no supported image files.
+            OSError: If image loading fails in the configured loader.
+        """
+        if not request.input_folder.exists():
+            raise ValueError(f"Input folder does not exist: {request.input_folder}")
+        if not request.input_folder.is_dir():
+            raise ValueError(f"Input path is not a directory: {request.input_folder}")
+
+        paths = self._sequence_loader.get_image_paths(request.input_folder)
+        if not paths:
+            raise ValueError("No supported image files found.")
+
+        images = self._sequence_loader.load_images(
+            paths,
+            resize_mode=request.resize_mode,
+        )
+
+        result = build_timeslice(
+            images=images,
+            spec=request.spec,
+        )
+
+        return RenderResponse(
+            result=result,
+            input_paths=paths,
+        )
+
+    def render_to_file(
+        self,
+        request: RenderRequest,
+        output_file: Path,
+    ) -> RenderResponse:
+        """Render a timeslice composite and save the image to disk.
+
+        Args:
+            request: Structured render input containing the source folder,
+                render specification, and resize behavior.
+            output_file: Destination path for the saved composite image.
+
+        Returns:
+            A `RenderResponse` containing the composite result and the ordered
+            source image paths used for rendering.
+
+        Raises:
+            ValueError: If no image writer was configured for this service.
+            OSError: If saving the rendered image fails.
+        """
+        if self._image_writer is None:
+            raise ValueError("No image writer configured.")
+
+        response = self.render(request)
+        self._image_writer.save(response.result.image, output_file)
+        return response
