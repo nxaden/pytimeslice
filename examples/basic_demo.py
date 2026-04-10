@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from fragmento_engine.domain.compositor import build_timeslice
-
+from fragmento_engine.domain.models import TimesliceSpec
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
 
@@ -105,14 +105,15 @@ def main():
     print(f"Found {len(paths)} images.")
     images = load_images(paths, resize_mode=args.resize_mode)
 
-    result = build_timeslice(
-        images=images,
+    spec = TimesliceSpec(
         orientation=args.orientation,
         num_slices=args.slices,
         reverse_time=args.reverse_time,
     )
 
-    Image.fromarray(result).save(args.output_file)
+    result = build_timeslice(images=images, spec=spec)
+
+    Image.fromarray(result.image).save(args.output_file)
     print(f"Saved: {args.output_file}")
 
 

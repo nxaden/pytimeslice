@@ -1,49 +1,14 @@
-from typing import List, Literal
+from __future__ import annotations
+
+from typing import Sequence
 
 import numpy as np
-import numpy.typing as npt
+
+from .models import CompositeResult, RGBImage, TimeslicePlan, TimesliceSpec
+from .planner import build_timeslice_plan
 
 
-Orientation = Literal["vertical", "horizontal"]
-
-
-def _build_timeslice(
-    height: int,
-    width: int,
-    num_slices: int,
-    images: List[np.ndarray],
-    frame_indices: npt.NDArray[np.int_],
-    orientation: Orientation,
-) -> np.ndarray:
-    """Build a time-slice image for the given orientation."""
-    output = np.zeros((height, width, 3), dtype=np.uint8)
-    span = width if orientation == "vertical" else height
-    edges = np.linspace(0, span, num_slices + 1).round().astype(int)
-
-    for i in range(num_slices):
-        start, end = edges[i], edges[i + 1]
-        if end <= start:
-            continue
-
-        frame = images[frame_indices[i]]
-
-        if orientation == "vertical":
-            output[:, start:end, :] = frame[:, start:end, :]
-        else:
-            output[start:end, :, :] = frame[start:end, :, :]
-
-    return output
-
-
-def build_timeslice(
-    images: List[np.ndarray],
-    orientation: Orientation = "vertical",
-    num_slices: int | None = None,
-    reverse_time: bool = False,
-) -> np.ndarray:
-    """Build a composite image by taking sequential vertical or horizontal slices
-    from an ordered list of RGB images.
-    """
+def _validate_images(images: Sequence[RGBImage]) -> tuple[int, int, int]:
     if not images:
         raise ValueError("No images loaded.")
 
@@ -51,27 +16,49 @@ def build_timeslice(
     if first.ndim != 3 or first.shape[2] != 3:
         raise ValueError("Expected RGB images.")
 
-    height, width, num_channels = first.shape
+    height, width, channels = first.shape
 
-    for img in images:
-        if img.shape != (height, width, num_channels):
+    for i, img in enumerate(images):
+        if img.ndim != 3 or img.shape[2] != 3:
+            raise ValueError(f"Image at index {i} is not an RGB image.")
+        if img.shape != (height, width, channels):
             raise ValueError(
                 "All images must have the same dimensions after preprocessing."
             )
 
-    if num_slices is None:
-        num_slices = len(images)
+    return height, width, channels
 
-    if num_slices < 1:
-        raise ValueError("num_slices must be at least 1.")
 
-    frame_indices: npt.NDArray[np.int_] = (
-        np.linspace(0, len(images) - 1, num_slices).round().astype(int)
+def apply_timeslice_plan(
+    images: Sequence[RGBImage],
+    plan: TimeslicePlan,
+) -> CompositeResult:
+    height, width, _ = _validate_images(images)
+    output = np.zeros((height, width, 3), dtype=np.uint8)
+
+    for band in plan.bands:
+        frame = images[band.frame_index]
+
+        if plan.orientation == "vertical":
+            output[:, band.start : band.end, :] = frame[:, band.start : band.end, :]
+        else:
+            output[band.start : band.end, :, :] = frame[band.start : band.end, :, :]
+
+    used_frame_indices = sorted({band.frame_index for band in plan.bands})
+
+    return CompositeResult(
+        image=output,
+        plan=plan,
+        used_frame_indices=used_frame_indices,
     )
 
-    if reverse_time:
-        frame_indices = frame_indices[::-1]
 
-    return _build_timeslice(
-        height, width, num_slices, images, frame_indices, orientation
-    )
+def build_timeslice(
+    images: Sequence[RGBImage],
+    spec: TimesliceSpec | None = None,
+) -> CompositeResult:
+    if spec is None:
+        spec = TimesliceSpec()
+
+    plan = build_timeslice_plan(images=images, spec=spec)
+    return apply_timeslice_plan(images=images, plan=plan)
