@@ -1,0 +1,462 @@
+# API Reference
+
+## Overview
+
+Fragmento Engine exposes a small public API at the package root for the common
+library use case:
+
+```python
+from fragmento_engine import TimesliceSpec, render_folder, render_images
+```
+
+For advanced usage, lower-level modules are also available under
+`fragmento_engine.application`, `fragmento_engine.domain`,
+`fragmento_engine.infrastructure`, and `fragmento_engine.interface`.
+
+## Public API
+
+### `fragmento_engine.TimesliceSpec`
+
+```python
+TimesliceSpec(
+    orientation: Literal["vertical", "horizontal"] = "vertical",
+    num_slices: int | None = None,
+    reverse_time: bool = False,
+)
+```
+
+Immutable render specification describing how a timeslice should be built.
+
+Fields:
+
+- `orientation`: Slice direction. `"vertical"` creates left-to-right strips.
+  `"horizontal"` creates top-to-bottom strips.
+- `num_slices`: Number of output bands. If omitted, one slice is generated per
+  input image.
+- `reverse_time`: Reverses the frame order used across the output span.
+
+Raises:
+
+- `ValueError`: Raised later in the render pipeline if the requested slice count
+  is less than `1` or exceeds the available output pixel span.
+
+### `fragmento_engine.render_images`
+
+```python
+render_images(
+    images: list[RGBImage],
+    spec: TimesliceSpec | None = None,
+) -> CompositeResult
+```
+
+Render a timeslice directly from in-memory RGB images.
+
+Parameters:
+
+- `images`: Ordered sequence of `numpy.uint8` RGB arrays with identical shape
+  `(height, width, 3)`.
+- `spec`: Optional render specification. Defaults to `TimesliceSpec()`.
+
+Returns:
+
+- `CompositeResult`: Rendered image plus the slice plan and the frame indices
+  used in the output.
+
+Raises:
+
+- `ValueError`: If no images are supplied, any image is not RGB, image shapes do
+  not match, or the render specification is invalid.
+
+Example:
+
+```python
+from fragmento_engine import TimesliceSpec, render_images
+
+result = render_images(
+    images=frames,
+    spec=TimesliceSpec(orientation="vertical", num_slices=20),
+)
+
+print(result.image.shape)
+print(result.used_frame_indices)
+```
+
+### `fragmento_engine.render_folder`
+
+```python
+render_folder(
+    input_folder: Path,
+    output_file: Path | None = None,
+    spec: TimesliceSpec | None = None,
+    resize_mode: Literal["crop", "resize"] = "crop",
+) -> RenderResponse
+```
+
+Load an image sequence from a folder, render a timeslice, and optionally save
+the result to disk.
+
+Parameters:
+
+- `input_folder`: Directory containing the source images.
+- `output_file`: Optional destination path for the rendered image.
+- `spec`: Optional render specification. Defaults to `TimesliceSpec()`.
+- `resize_mode`: Strategy used when later source images do not match the base
+  frame size:
+  - `"crop"`: Resize to fill, then center crop.
+  - `"resize"`: Directly resize to the base frame size.
+
+Returns:
+
+- `RenderResponse`: Composite output plus the ordered input paths used.
+
+Raises:
+
+- `ValueError`: If the folder does not exist, is not a directory, contains no
+  supported images, or the render specification is invalid.
+- `OSError`: If image loading or output writing fails.
+
+Example:
+
+```python
+from pathlib import Path
+
+from fragmento_engine import TimesliceSpec, render_folder
+
+response = render_folder(
+    input_folder=Path("./frames"),
+    output_file=Path("./out/timeslice.jpg"),
+    spec=TimesliceSpec(
+        orientation="horizontal",
+        num_slices=24,
+        reverse_time=False,
+    ),
+    resize_mode="crop",
+)
+
+print(response.result.image.shape)
+print(len(response.input_paths))
+```
+
+## Data Types
+
+### `fragmento_engine.domain.models`
+
+#### `Orientation`
+
+```python
+Orientation = Literal["vertical", "horizontal"]
+```
+
+#### `ResizeMode`
+
+```python
+ResizeMode = Literal["crop", "resize"]
+```
+
+Resize behavior used by folder-based loading and application-layer services.
+
+#### `RGBImage`
+
+```python
+RGBImage = numpy.typing.NDArray[numpy.uint8]
+```
+
+Represents an image array with shape `(height, width, 3)`.
+
+#### `FrameRef`
+
+```python
+FrameRef(index: int, path: Path)
+```
+
+Reference to a source frame on disk.
+
+#### `SequenceInfo`
+
+```python
+SequenceInfo(
+    frames: list[FrameRef],
+    height: int,
+    width: int,
+    channels: int = 3,
+)
+```
+
+Metadata describing a normalized frame sequence.
+
+#### `SliceBand`
+
+```python
+SliceBand(frame_index: int, start: int, end: int)
+```
+
+Describes one band in the output composite:
+
+- `frame_index`: Source frame selected for the band.
+- `start`: Inclusive band start pixel on the active axis.
+- `end`: Exclusive band end pixel on the active axis.
+
+#### `TimeslicePlan`
+
+```python
+TimeslicePlan(
+    orientation: Orientation,
+    bands: list[SliceBand],
+)
+```
+
+Concrete slice layout generated from a `TimesliceSpec`.
+
+#### `CompositeResult`
+
+```python
+CompositeResult(
+    image: RGBImage,
+    plan: TimeslicePlan,
+    used_frame_indices: list[int],
+)
+```
+
+Final render output plus traceable planning metadata.
+
+## Application Layer
+
+### `fragmento_engine.application.services.RenderRequest`
+
+```python
+RenderRequest(
+    input_folder: Path,
+    spec: TimesliceSpec,
+    resize_mode: Literal["crop", "resize"] = "crop",
+)
+```
+
+Structured input for the folder-based render workflow.
+
+### `fragmento_engine.application.services.RenderResponse`
+
+```python
+RenderResponse(
+    result: CompositeResult,
+    input_paths: list[Path],
+)
+```
+
+Structured output for the folder-based render workflow.
+
+### `fragmento_engine.application.services.ImageSequenceLoader`
+
+Protocol used by the application service to discover and load image sequences.
+
+Methods:
+
+```python
+get_image_paths(folder: Path) -> list[Path]
+load_images(
+    paths: Sequence[Path],
+    resize_mode: Literal["crop", "resize"] = "crop",
+) -> list[RGBImage]
+```
+
+### `fragmento_engine.application.services.ImageWriter`
+
+Protocol used by the application service to save rendered images.
+
+Methods:
+
+```python
+save(image: RGBImage, output_file: Path) -> None
+```
+
+### `fragmento_engine.application.services.RenderTimesliceService`
+
+```python
+RenderTimesliceService(
+    sequence_loader: ImageSequenceLoader,
+    image_writer: ImageWriter | None = None,
+)
+```
+
+Application service that coordinates the folder-based render workflow.
+
+Methods:
+
+#### `render`
+
+```python
+render(request: RenderRequest) -> RenderResponse
+```
+
+Validates the input folder, discovers image paths, loads normalized images,
+renders the composite, and returns the result.
+
+#### `render_to_file`
+
+```python
+render_to_file(request: RenderRequest, output_file: Path) -> RenderResponse
+```
+
+Runs `render`, then persists the rendered image through the configured writer.
+
+#### `create_render_service`
+
+```python
+create_render_service() -> RenderTimesliceService
+```
+
+Factory defined in `fragmento_engine.app` that wires the default production
+adapters:
+
+- `PILImageSequenceLoader`
+- `PILImageWriter`
+
+## Domain Functions
+
+### `fragmento_engine.domain.planner.build_timeslice_plan`
+
+```python
+build_timeslice_plan(
+    images: Sequence[RGBImage],
+    spec: TimesliceSpec,
+) -> TimeslicePlan
+```
+
+Build a concrete slice plan from normalized source images.
+
+Behavior:
+
+- Validates that images are RGB and share a common shape.
+- Uses `spec.num_slices` or defaults to `len(images)`.
+- Maps output bands to source frames with evenly spaced frame indices.
+- Splits the active output axis into evenly spaced pixel bands.
+
+Raises:
+
+- `ValueError`: If no images are supplied, image shapes are invalid,
+  `num_slices < 1`, `orientation` is invalid, or `num_slices` exceeds the
+  output pixel span.
+
+### `fragmento_engine.domain.compositor.apply_timeslice_plan`
+
+```python
+apply_timeslice_plan(
+    images: Sequence[RGBImage],
+    plan: TimeslicePlan,
+) -> CompositeResult
+```
+
+Apply a previously generated `TimeslicePlan` to a normalized image sequence.
+
+### `fragmento_engine.domain.compositor.build_timeslice`
+
+```python
+build_timeslice(
+    images: Sequence[RGBImage],
+    spec: TimesliceSpec | None = None,
+) -> CompositeResult
+```
+
+Convenience wrapper that combines planning and compositing.
+
+## Infrastructure
+
+### `fragmento_engine.infrastructure.image_loader.VALID_EXTENSIONS`
+
+```python
+{".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
+```
+
+Supported file extensions for folder-based discovery.
+
+### `fragmento_engine.infrastructure.image_loader.center_crop_to_size`
+
+```python
+center_crop_to_size(
+    img: PIL.Image.Image,
+    target_w: int,
+    target_h: int,
+) -> PIL.Image.Image
+```
+
+Resize an image to fill the target size, then crop the centered region.
+
+### `fragmento_engine.infrastructure.image_loader.PILImageSequenceLoader`
+
+Pillow-based adapter that implements the `ImageSequenceLoader` protocol.
+
+Methods:
+
+```python
+get_image_paths(folder: Path) -> list[Path]
+load_images(
+    paths: Sequence[Path],
+    resize_mode: Literal["crop", "resize"] = "crop",
+) -> list[RGBImage]
+```
+
+Notes:
+
+- Paths are returned in sorted order.
+- The first image establishes the canonical output size.
+- Later images are cropped or resized to match the first image.
+
+### `fragmento_engine.infrastructure.image_writer.PILImageWriter`
+
+Pillow-based adapter that implements the `ImageWriter` protocol.
+
+Methods:
+
+```python
+save(image: RGBImage, output_file: Path) -> None
+```
+
+Behavior:
+
+- Creates parent directories as needed.
+- Saves the output with Pillow using the destination file extension.
+
+## CLI Module
+
+The CLI lives in `fragmento_engine.interface.cli`.
+
+### `build_parser`
+
+```python
+build_parser() -> argparse.ArgumentParser
+```
+
+Creates the command-line parser for the `fragmento` command.
+
+### `main`
+
+```python
+main() -> None
+```
+
+Parses CLI arguments, builds a `TimesliceSpec`, renders the folder, and prints
+basic status information.
+
+Supported arguments:
+
+- `input_folder`
+- `output_file`
+- `--orientation {vertical,horizontal}`
+- `--slices`
+- `--resize-mode {crop,resize}`
+- `--reverse-time`
+
+## Stability Guide
+
+Prefer the package root for normal library usage:
+
+```python
+from fragmento_engine import TimesliceSpec, render_folder, render_images
+```
+
+Use lower-level modules when you need tighter control over the render pipeline:
+
+- `fragmento_engine.application.services`: Workflow orchestration and service
+  boundaries.
+- `fragmento_engine.domain.*`: Planning and compositing primitives.
+- `fragmento_engine.infrastructure.*`: Pillow-based adapters for file I/O.
+- `fragmento_engine.interface.cli`: Command-line entry point.

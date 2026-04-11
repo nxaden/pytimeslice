@@ -37,6 +37,9 @@ Fragmento Engine is organized into layers:
 - **Infrastructure**: image loading and writing adapters
 - **Interface**: CLI and future user-facing entry points
 
+See [API_REFERENCE.md](docs/API_REFERENCE.md) for the Python API surface and
+module-level reference.
+
 ## Project Structure
 
 ```text
@@ -53,7 +56,7 @@ src/
     ├── infrastructure/
     │   ├── image_loader.py
     │   └── image_writer.py
-    ├── interfaces/
+    ├── interface/
     │   └── cli.py
     └── shared/
         └── types.py
@@ -81,7 +84,7 @@ Fragmento Engine is intended to be usable as a Python library.
 
 Example:
 
-```sh
+```python
 from pathlib import Path
 
 from fragmento_engine import render_folder, TimesliceSpec

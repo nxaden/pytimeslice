@@ -45,7 +45,7 @@ Repository = "https://github.com/nxaden/fragmento-engine"
 Issues = "https://github.com/nxaden/fragmento-engine/issues"
 
 [project.scripts]
-fragmento = "fragmento_engine.interfaces.cli:main"
+fragmento = "fragmento_engine.interface.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

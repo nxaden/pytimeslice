@@ -42,7 +42,7 @@ fragmento_engine/
     image_loader.py
     image_writer.py
 
-  interfaces/
+  interface/
     cli.py
 ```
 
