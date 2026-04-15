@@ -2,10 +2,12 @@ PYTHON := python3
 VENV := .venv
 ACTIVATE := source $(VENV)/bin/activate
 
-setup:
+bootstrap:
 	$(PYTHON) -m venv $(VENV)
 	$(ACTIVATE) && pip install --upgrade pip
 	$(ACTIVATE) && pip install -e ".[dev]"
+
+setup: bootstrap
 	$(ACTIVATE) && pre-commit install
 
 run:

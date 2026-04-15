@@ -40,7 +40,7 @@ Current focus includes:
 - **Infrastructure**: image loading and writing adapters
 - **Interface**: CLI and future user-facing entry points
 
-See [the API reference](https://github.com/nxaden/fragmento-engine/blob/main/docs/API_REFERENCE.md)
+See [the API reference](https://github.com/nxaden/pytimeslice/blob/main/docs/API_REFERENCE.md)
 for the Python API surface and module-level reference.
 
 ## Project Structure
@@ -190,7 +190,7 @@ pytimeslice ./frames \
 ```
 
 More CLI recipes, including overlay practice commands, live in
-[the usage examples guide](https://github.com/nxaden/fragmento-engine/blob/main/docs/USAGE_EXAMPLES.md).
+[the usage examples guide](https://github.com/nxaden/pytimeslice/blob/main/docs/USAGE_EXAMPLES.md).
 
 ## Packaging
 
@@ -203,7 +203,7 @@ make check-dist
 ```
 
 The release checklist lives in
-[RELEASING.md](https://github.com/nxaden/fragmento-engine/blob/main/RELEASING.md).
+[RELEASING.md](https://github.com/nxaden/pytimeslice/blob/main/RELEASING.md).
 
 ## Roadmap
 

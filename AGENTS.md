@@ -19,6 +19,8 @@ Assume the local virtual environment created by `make setup`.
 Prefer `make check` before finishing a feature unless the change is docs-only.
 Prefer `make build` and `make check-dist` before finishing packaging or release
 work.
+GitHub Actions mirrors `make check` and `make build` plus `make check-dist`;
+keep the workflow and Make targets aligned.
 
 ## Architecture Rules
 

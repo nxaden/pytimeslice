@@ -50,10 +50,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/nxaden/fragmento-engine"
-Repository = "https://github.com/nxaden/fragmento-engine"
-Issues = "https://github.com/nxaden/fragmento-engine/issues"
-Documentation = "https://github.com/nxaden/fragmento-engine/tree/main/docs"
+Homepage = "https://github.com/nxaden/pytimeslice"
+Repository = "https://github.com/nxaden/pytimeslice"
+Issues = "https://github.com/nxaden/pytimeslice/issues"
+Documentation = "https://github.com/nxaden/pytimeslice/tree/main/docs"
 
 [project.scripts]
 pytimeslice = "pytimeslice.interface.cli:main"
