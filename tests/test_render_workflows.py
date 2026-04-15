@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 import fragmento_engine.app as app_module
 from fragmento_engine import render_images
@@ -10,7 +11,7 @@ from fragmento_engine.application.services import (
     RenderResponse,
     RenderTimesliceService,
 )
-from fragmento_engine.domain.models import RGBImage, TimesliceSpec
+from fragmento_engine.domain.models import RGBImage, SliceEffects, TimesliceSpec
 from fragmento_engine.interface.cli import build_parser
 
 
@@ -22,8 +23,11 @@ class RecordingLoader:
     def __init__(self, paths: list[Path], images: list[RGBImage]) -> None:
         self.paths = paths
         self.images = images
+        self.get_image_paths_calls = 0
+        self.load_images_calls = 0
 
     def get_image_paths(self, folder: Path) -> list[Path]:
+        self.get_image_paths_calls += 1
         return self.paths
 
     def load_images(
@@ -31,6 +35,7 @@ class RecordingLoader:
         paths: list[Path],
         resize_mode: str = "crop",
     ) -> list[RGBImage]:
+        self.load_images_calls += 1
         return self.images
 
 
@@ -258,6 +263,61 @@ def test_render_progression_gif_can_use_smooth_loop_slice_counts(
     assert duration_ms == 120
 
 
+def test_service_rejects_invalid_effects_before_loading_images(
+    tmp_path: Path,
+) -> None:
+    input_folder = tmp_path / "frames"
+    input_folder.mkdir()
+    loader = RecordingLoader(
+        paths=[input_folder / "001.png"],
+        images=[_solid_frame(0)],
+    )
+    service = RenderTimesliceService(
+        sequence_loader=loader,
+        image_writer=RecordingWriter(),
+    )
+
+    with pytest.raises(ValueError, match="effects.border_width must be at least 0."):
+        service.render(
+            RenderRequest(
+                input_folder=input_folder,
+                spec=TimesliceSpec(
+                    effects=SliceEffects(border_width=-1),
+                ),
+            )
+        )
+
+    assert loader.get_image_paths_calls == 0
+    assert loader.load_images_calls == 0
+
+
+def test_service_rejects_non_positive_gif_duration_before_loading_images(
+    tmp_path: Path,
+) -> None:
+    input_folder = tmp_path / "frames"
+    input_folder.mkdir()
+    loader = RecordingLoader(
+        paths=[input_folder / "001.png"],
+        images=[_solid_frame(0)],
+    )
+    service = RenderTimesliceService(
+        sequence_loader=loader,
+        image_writer=RecordingWriter(),
+    )
+
+    with pytest.raises(ValueError, match="duration_ms must be greater than 0."):
+        service.render_progression_gif_to_file(
+            RenderRequest(
+                input_folder=input_folder,
+                spec=TimesliceSpec(),
+            ),
+            duration_ms=0,
+        )
+
+    assert loader.get_image_paths_calls == 0
+    assert loader.load_images_calls == 0
+
+
 def test_cli_output_file_is_optional_for_progression_gif() -> None:
     parser = build_parser()
     args = parser.parse_args(
@@ -274,3 +334,30 @@ def test_cli_output_file_is_optional_for_progression_gif() -> None:
     assert args.progression_gif is True
     assert args.gif_frame_duration_ms == 180
     assert args.gif_smooth_loop is True
+
+
+def test_cli_rejects_negative_effect_widths() -> None:
+    parser = build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "frames",
+                "--border",
+                "-1",
+            ]
+        )
+
+
+def test_cli_rejects_non_positive_gif_duration() -> None:
+    parser = build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "frames",
+                "--progression-gif",
+                "--gif-frame-duration-ms",
+                "0",
+            ]
+        )

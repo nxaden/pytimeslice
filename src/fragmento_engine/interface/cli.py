@@ -7,6 +7,25 @@ from fragmento_engine import render_folder_to_file, render_progression_gif
 from fragmento_engine import SliceEffects, TimesliceSpec
 
 
+def _parse_non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Expected an integer value.") from exc
+
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("Value must be at least 0.")
+
+    return parsed
+
+
+def _parse_positive_int(value: str) -> int:
+    parsed = _parse_non_negative_int(value)
+    if parsed == 0:
+        raise argparse.ArgumentTypeError("Value must be greater than 0.")
+    return parsed
+
+
 def _parse_color(value: str) -> tuple[int, int, int]:
     raw = value.strip()
 
@@ -86,7 +105,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["vertical", "horizontal"],
         default="vertical",
     )
-    parser.add_argument("--slices", type=int, default=None)
+    parser.add_argument("--slices", type=_parse_positive_int, default=None)
     parser.add_argument(
         "--resize-mode",
         choices=["crop", "resize"],
@@ -102,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--gif-frame-duration-ms",
-        type=int,
+        type=_parse_positive_int,
         default=250,
         help="Per-frame duration in milliseconds for progression GIFs.",
     )
@@ -117,7 +136,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reverse-time", action="store_true")
     parser.add_argument(
         "--border",
-        type=int,
+        type=_parse_non_negative_int,
         default=0,
         help="Divider thickness in pixels drawn at slice boundaries.",
     )
@@ -145,7 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--shadow",
-        type=int,
+        type=_parse_non_negative_int,
         default=0,
         help="Inner shadow width in pixels on each side of a slice boundary.",
     )
@@ -157,7 +176,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--highlight",
-        type=int,
+        type=_parse_non_negative_int,
         default=0,
         help="Inner highlight width in pixels on each side of a slice boundary.",
     )
@@ -176,7 +195,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--feather",
-        type=int,
+        type=_parse_non_negative_int,
         default=0,
         help="Blend width in pixels applied inside each neighboring slice.",
     )

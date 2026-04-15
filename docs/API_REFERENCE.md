@@ -376,18 +376,20 @@ SliceEffects(
 Optional boundary treatments applied after the base timeslice is assembled.
 
 - `border_width`: Thickness of the divider line centered on each slice
-  boundary.
+  boundary. Must be at least `0`.
 - `border_color`: Divider color used when `border_color_mode="solid"`.
 - `border_opacity`: Border blend strength from `0.0` to `1.0`.
 - `border_color_mode`: Chooses a fixed color, an auto-sampled seam color, or a
   seam-derived gradient.
 - `shadow_width`: Inner shadow width in pixels on each side of a boundary.
+  Must be at least `0`.
 - `shadow_opacity`: Shadow strength from `0.0` to `1.0`.
 - `highlight_width`: Inner highlight width in pixels on each side of a
-  boundary.
+  boundary. Must be at least `0`.
 - `highlight_opacity`: Highlight strength from `0.0` to `1.0`.
 - `highlight_color`: Highlight color used when `highlight_width > 0`.
 - `feather_width`: Blend width in pixels applied inside each neighboring slice.
+  Must be at least `0`.
 - `curve`: Ramp shape used by feather, shadow, highlight, and gradient borders.
 
 #### `TimeslicePlan`
@@ -530,6 +532,7 @@ render_progression_gif_to_file(
 ```
 
 Builds a power-of-two slice progression and persists it as an animated GIF.
+`duration_ms` must be greater than `0`.
 
 #### `create_render_service`
 
@@ -698,6 +701,12 @@ Supported arguments:
 - `--highlight-color`
 - `--feather`
 - `--curve`
+
+Validation notes:
+
+- `--slices` must be greater than `0`.
+- `--gif-frame-duration-ms` must be greater than `0`.
+- `--border`, `--shadow`, `--highlight`, and `--feather` must be at least `0`.
 
 ## Stability Guide
 

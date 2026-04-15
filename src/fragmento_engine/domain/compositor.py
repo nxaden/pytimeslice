@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence as SequenceCollection
 from typing import Sequence
 
 import numpy as np
@@ -12,11 +11,9 @@ from .models import (
     SliceEffects,
     TimeslicePlan,
     TimesliceSpec,
+    validate_slice_effects,
 )
 from .planner import build_timeslice_plan
-
-_VALID_BORDER_COLOR_MODES = {"solid", "auto", "gradient"}
-_VALID_CURVES = {"linear", "smoothstep", "cosine", "hard"}
 
 
 def _validate_images(images: Sequence[RGBImage]) -> tuple[int, int, int]:
@@ -38,40 +35,6 @@ def _validate_images(images: Sequence[RGBImage]) -> tuple[int, int, int]:
             )
 
     return height, width, channels
-
-
-def _validate_color(name: str, color: SequenceCollection[int]) -> None:
-    if len(color) != 3:
-        raise ValueError(f"{name} must contain exactly 3 channels.")
-    if any(channel < 0 or channel > 255 for channel in color):
-        raise ValueError(f"{name} channels must be between 0 and 255.")
-
-
-def _validate_effects(effects: SliceEffects) -> None:
-    if effects.border_width < 0:
-        raise ValueError("effects.border_width must be at least 0.")
-    if effects.highlight_width < 0:
-        raise ValueError("effects.highlight_width must be at least 0.")
-    if effects.shadow_width < 0:
-        raise ValueError("effects.shadow_width must be at least 0.")
-    if effects.feather_width < 0:
-        raise ValueError("effects.feather_width must be at least 0.")
-    if not 0.0 <= effects.border_opacity <= 1.0:
-        raise ValueError("effects.border_opacity must be between 0.0 and 1.0.")
-    if not 0.0 <= effects.shadow_opacity <= 1.0:
-        raise ValueError("effects.shadow_opacity must be between 0.0 and 1.0.")
-    if not 0.0 <= effects.highlight_opacity <= 1.0:
-        raise ValueError("effects.highlight_opacity must be between 0.0 and 1.0.")
-    if effects.border_color_mode not in _VALID_BORDER_COLOR_MODES:
-        raise ValueError(
-            "effects.border_color_mode must be one of solid, auto, or gradient."
-        )
-    if effects.curve not in _VALID_CURVES:
-        raise ValueError(
-            "effects.curve must be one of linear, smoothstep, cosine, or hard."
-        )
-    _validate_color("effects.border_color", effects.border_color)
-    _validate_color("effects.highlight_color", effects.highlight_color)
 
 
 def _inner_effect_extent(
@@ -210,7 +173,7 @@ def _apply_color_region(
     start: int,
     end: int,
     weights: np.ndarray,
-    color: SequenceCollection[int],
+    color: Sequence[int],
 ) -> None:
     if start >= end:
         return
@@ -273,7 +236,7 @@ def _apply_boundary_highlight(
     left_extent: int,
     right_extent: int,
     opacity: float,
-    color: SequenceCollection[int],
+    color: Sequence[int],
     curve: str,
 ) -> None:
     if left_extent > 0:
@@ -338,7 +301,7 @@ def _apply_slice_effects(
     plan: TimeslicePlan,
     effects: SliceEffects,
 ) -> None:
-    _validate_effects(effects)
+    validate_slice_effects(effects)
 
     if len(plan.bands) < 2:
         return

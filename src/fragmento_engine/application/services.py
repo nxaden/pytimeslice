@@ -11,6 +11,7 @@ from fragmento_engine.domain.models import (
     CompositeResult,
     RGBImage,
     TimesliceSpec,
+    validate_slice_effects,
 )
 from fragmento_engine.shared.types import ResizeMode
 
@@ -242,6 +243,10 @@ class RenderTimesliceService:
         self._sequence_loader = sequence_loader
         self._image_writer = image_writer
 
+    def _validate_request(self, request: RenderRequest) -> None:
+        if request.spec.effects is not None:
+            validate_slice_effects(request.spec.effects)
+
     def _load_paths_and_images(
         self,
         request: RenderRequest,
@@ -250,6 +255,8 @@ class RenderTimesliceService:
             raise ValueError(f"Input folder does not exist: {request.input_folder}")
         if not request.input_folder.is_dir():
             raise ValueError(f"Input path is not a directory: {request.input_folder}")
+
+        self._validate_request(request)
 
         paths = self._sequence_loader.get_image_paths(request.input_folder)
         if not paths:
@@ -337,6 +344,8 @@ class RenderTimesliceService:
         """Render a power-of-two slice progression and save it as an animated GIF."""
         if self._image_writer is None:
             raise ValueError("No image writer configured.")
+        if duration_ms <= 0:
+            raise ValueError("duration_ms must be greater than 0.")
 
         paths, images = self._load_paths_and_images(request)
         height, width, _ = images[0].shape

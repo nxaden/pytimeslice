@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Sequence
 
 import numpy as np
 import numpy.typing as npt
@@ -10,6 +10,9 @@ BoundaryCurve = Literal["linear", "smoothstep", "cosine", "hard"]
 BorderColorMode = Literal["solid", "auto", "gradient"]
 RGBColor = tuple[int, int, int]
 RGBImage = npt.NDArray[np.uint8]
+
+_VALID_BORDER_COLOR_MODES = {"solid", "auto", "gradient"}
+_VALID_CURVES = {"linear", "smoothstep", "cosine", "hard"}
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,40 @@ class SliceEffects:
     highlight_color: RGBColor = (255, 255, 255)
     feather_width: int = 0
     curve: BoundaryCurve = "linear"
+
+
+def validate_rgb_color(name: str, color: Sequence[int]) -> None:
+    if len(color) != 3:
+        raise ValueError(f"{name} must contain exactly 3 channels.")
+    if any(channel < 0 or channel > 255 for channel in color):
+        raise ValueError(f"{name} channels must be between 0 and 255.")
+
+
+def validate_slice_effects(effects: SliceEffects) -> None:
+    if effects.border_width < 0:
+        raise ValueError("effects.border_width must be at least 0.")
+    if effects.highlight_width < 0:
+        raise ValueError("effects.highlight_width must be at least 0.")
+    if effects.shadow_width < 0:
+        raise ValueError("effects.shadow_width must be at least 0.")
+    if effects.feather_width < 0:
+        raise ValueError("effects.feather_width must be at least 0.")
+    if not 0.0 <= effects.border_opacity <= 1.0:
+        raise ValueError("effects.border_opacity must be between 0.0 and 1.0.")
+    if not 0.0 <= effects.shadow_opacity <= 1.0:
+        raise ValueError("effects.shadow_opacity must be between 0.0 and 1.0.")
+    if not 0.0 <= effects.highlight_opacity <= 1.0:
+        raise ValueError("effects.highlight_opacity must be between 0.0 and 1.0.")
+    if effects.border_color_mode not in _VALID_BORDER_COLOR_MODES:
+        raise ValueError(
+            "effects.border_color_mode must be one of solid, auto, or gradient."
+        )
+    if effects.curve not in _VALID_CURVES:
+        raise ValueError(
+            "effects.curve must be one of linear, smoothstep, cosine, or hard."
+        )
+    validate_rgb_color("effects.border_color", effects.border_color)
+    validate_rgb_color("effects.highlight_color", effects.highlight_color)
 
 
 @dataclass(frozen=True)
