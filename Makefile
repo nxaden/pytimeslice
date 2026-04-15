@@ -1,45 +1,54 @@
 PYTHON := python3
 VENV := .venv
-ACTIVATE := source $(VENV)/bin/activate
+VENV_BIN := $(VENV)/bin
+VENV_PYTHON := $(VENV_BIN)/python
+VENV_PIP := $(VENV_BIN)/pip
+PRE_COMMIT := $(VENV_BIN)/pre-commit
+PYTEST := $(VENV_BIN)/pytest
+RUFF := $(VENV_BIN)/ruff
+BLACK := $(VENV_BIN)/black
+MYPY := $(VENV_BIN)/mypy
+TWINE := $(VENV_BIN)/python -m twine
+BUILD := $(VENV_BIN)/python -m build
 
 bootstrap:
 	$(PYTHON) -m venv $(VENV)
-	$(ACTIVATE) && pip install --upgrade pip
-	$(ACTIVATE) && pip install -e ".[dev]"
+	$(VENV_PIP) install --upgrade pip
+	$(VENV_PIP) install -e ".[dev]"
 
 setup: bootstrap
-	$(ACTIVATE) && pre-commit install
+	$(PRE_COMMIT) install
 
 run:
-	$(ACTIVATE) && python -m pytimeslice.interface.cli --help
+	$(VENV_PYTHON) -m pytimeslice.interface.cli --help
 
 test:
-	$(ACTIVATE) && pytest
+	$(PYTEST)
 
 lint:
-	$(ACTIVATE) && ruff check .
+	$(RUFF) check .
 
 format:
-	$(ACTIVATE) && black .
+	$(BLACK) .
 
 typecheck:
-	$(ACTIVATE) && mypy src
+	$(MYPY) src
 
 check:
-	$(ACTIVATE) && ruff check .
-	$(ACTIVATE) && mypy src
-	$(ACTIVATE) && pytest
+	$(RUFF) check .
+	$(MYPY) src
+	$(PYTEST)
 
 clean:
 	rm -rf build dist src/*.egg-info
 
 build:
-	$(ACTIVATE) && python -m build
+	$(BUILD)
 
 check-dist:
-	$(ACTIVATE) && python -m twine check dist/*
+	$(TWINE) check dist/*
 
 publish-testpypi:
-	$(ACTIVATE) && python -m twine upload --repository testpypi dist/*
+	$(TWINE) upload --repository testpypi dist/*
 
 release-check: check build check-dist
